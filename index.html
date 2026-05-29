@@ -291,12 +291,27 @@
     .thumbs {
       display: grid; grid-template-columns: repeat(4,1fr); gap: 8px;
     }
+    .thumb-wrap {
+      position: relative; border-radius: 12px; overflow: visible;
+    }
     .thumbs img {
       width: 100%; border-radius: 12px;
       border: 2.5px solid white;
       box-shadow: 0 4px 14px rgba(200,80,120,.18);
       aspect-ratio: 16/9; object-fit: cover;
+      display: block;
     }
+    .del-btn {
+      position: absolute; top: -7px; right: -7px;
+      width: 22px; height: 22px; border-radius: 50%;
+      background: #e8577a; color: white; border: 2px solid white;
+      font-size: 10px; font-weight: 700; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 2px 6px rgba(200,80,120,.4);
+      transition: transform .15s, background .15s;
+      z-index: 10; line-height: 1;
+    }
+    .del-btn:hover { background: #c0406a; transform: scale(1.15); }
 
     .action-row {
       display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px;
@@ -631,7 +646,17 @@ function bindData() {
       document.getElementById("shootBtn").disabled = true;
       runCountdown(d.num);
     }
-    if (d.type === "snap") receiveSnap(d.imgData);
+    if (d.type === "snap") receiveSnap(d.imgData, d.snapId);
+    if (d.type === "delete") {
+      if (photos[d.idx]) {
+        photos[d.idx] = { mine:null, theirs:null, combined:null, deleted:true };
+        const wrap = document.querySelector(`.thumb-wrap[data-idx="${d.idx}"]`);
+        if (wrap) wrap.remove();
+        updateStatus();
+        const done = photos.filter(p=>p.combined).length;
+        if (done < 4) document.getElementById("shootBtn").disabled = false;
+      }
+    }
   });
   conn.on("close", () => setStatus("Friend disconnected 💔","err"));
   conn.on("error", console.error);
@@ -647,7 +672,9 @@ function enterBooth() {
 
 /* ═══════════ COUNTDOWN ═══════════ */
 function startCountdown() {
-  if (countingDown || photos.length >= 4) return;
+  // BUG FIX: count only COMPLETED photos, not all slots
+  const done = photos.filter(p => p.combined).length;
+  if (countingDown || done >= 4) return;
   countingDown = true;
   document.getElementById("shootBtn").disabled = true;
   syncCountdown(3);
@@ -681,10 +708,7 @@ function doFlash() {
   setTimeout(()=>f.classList.remove("go"), 400);
 }
 
-/* ═══════════ CAPTURE ═══════════
-   We capture ONLY our own video, send it to friend.
-   Each side builds the combined (me left, friend right) frame locally.
-*/
+/* ═══════════ CAPTURE ═══════════ */
 function captureFrame() {
   const vid = document.getElementById("myVid");
   const c = document.createElement("canvas");
@@ -695,21 +719,27 @@ function captureFrame() {
   ctx.save(); ctx.scale(-1,1); ctx.drawImage(vid,-400,0,400,300); ctx.restore();
 
   const imgData = c.toDataURL("image/jpeg", .85);
-  if (conn?.open) conn.send({ type:"snap", imgData });
 
-  // store my frame, wait for friend's
-  photos.push({ mine: c, theirs: null });
+  // BUG FIX: use a unique snapId so host/guest frames always pair correctly
+  const snapId = Date.now() + "-" + Math.random().toString(36).slice(2,6);
+  if (conn?.open) conn.send({ type:"snap", imgData, snapId });
+
+  photos.push({ mine: c, theirs: null, snapId, combined: null });
   tryFinalize(photos.length - 1);
 }
 
-function receiveSnap(imgData) {
-  // find slot missing theirs
-  let i = photos.findIndex(p => p.theirs === null && p.mine !== null);
+function receiveSnap(imgData, snapId) {
+  // BUG FIX: match by snapId if available, otherwise first incomplete slot
+  let i = snapId
+    ? photos.findIndex(p => p.snapId === snapId && !p.theirs)
+    : photos.findIndex(p => p.theirs === null && p.mine !== null);
+
   if (i === -1) {
-    // race: friend snapped first
-    photos.push({ mine: null, theirs: null });
+    // Friend snapped before us — create a holding slot
+    photos.push({ mine: null, theirs: null, snapId: snapId || null, combined: null });
     i = photos.length - 1;
   }
+
   const img = new Image();
   img.onload = () => {
     const c = document.createElement("canvas");
@@ -725,15 +755,15 @@ function tryFinalize(i) {
   const p = photos[i];
   if (!p?.mine || !p?.theirs) return;
 
-  // Build the COMBINED wide frame — seamlessly side by side
   const combined = buildCombined(p.mine, p.theirs);
   p.combined = combined;
 
-  addThumb(combined);
+  addThumb(combined, i);
   updateStatus();
 
   countingDown = false;
-  if (photos.length < 4) document.getElementById("shootBtn").disabled = false;
+  const done = photos.filter(p=>p.combined).length;
+  if (done < 4) document.getElementById("shootBtn").disabled = false;
 }
 
 /* Build a single wide canvas: [mine | theirs] with soft centre blend */
@@ -742,11 +772,8 @@ function buildCombined(left, right) {
   const c = document.createElement("canvas");
   c.width = W; c.height = H;
   const ctx = c.getContext("2d");
-
   ctx.drawImage(left,  0,   0, W/2, H);
   ctx.drawImage(right, W/2, 0, W/2, H);
-
-  // subtle gradient at seam
   const g = ctx.createLinearGradient(W/2-18,0,W/2+18,0);
   g.addColorStop(0,   "rgba(253,245,240,0)");
   g.addColorStop(.45, "rgba(253,245,240,.22)");
@@ -754,14 +781,50 @@ function buildCombined(left, right) {
   g.addColorStop(1,   "rgba(253,245,240,0)");
   ctx.fillStyle = g;
   ctx.fillRect(W/2-18, 0, 36, H);
-
   return c;
 }
 
-function addThumb(canvas) {
+/* ═══════════ THUMBNAIL + DELETE BUTTON ═══════════ */
+function addThumb(canvas, idx) {
+  const wrap = document.createElement("div");
+  wrap.className = "thumb-wrap";
+  wrap.dataset.idx = idx;
+
   const img = document.createElement("img");
   img.src = canvas.toDataURL();
-  document.getElementById("thumbs").appendChild(img);
+
+  // Delete / retake button
+  const del = document.createElement("button");
+  del.className = "del-btn";
+  del.innerText = "✕";
+  del.title = "Delete & retake";
+  del.onclick = (e) => {
+    e.stopPropagation();
+    deletePhoto(idx);
+  };
+
+  wrap.appendChild(img);
+  wrap.appendChild(del);
+  document.getElementById("thumbs").appendChild(wrap);
+}
+
+function deletePhoto(idx) {
+  // Remove from photos array (mark as deleted)
+  photos[idx] = { mine:null, theirs:null, combined:null, deleted:true };
+
+  // Remove thumbnail from DOM
+  const wrap = document.querySelector(`.thumb-wrap[data-idx="${idx}"]`);
+  if (wrap) wrap.remove();
+
+  // Re-number remaining thumb data-idx stays same — just recount
+  updateStatus();
+
+  // Re-enable shoot button if under 4 completed
+  const done = photos.filter(p=>p.combined).length;
+  if (done < 4) document.getElementById("shootBtn").disabled = false;
+
+  // Notify friend to also delete that slot
+  if (conn?.open) conn.send({ type:"delete", idx });
 }
 
 function updateStatus() {
