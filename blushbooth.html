@@ -1,0 +1,1845 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Blush Booth 💕</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400;1,600&family=DM+Sans:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+      :root {
+        --rose: #e8577a;
+        --deep: #a03060;
+        --cream: #fdf5f0;
+        --soft: #f9dde9;
+        --blush: #f2a7c3;
+        --petal: #fce8f0;
+        --ink: #1a0a12;
+        --glass: rgba(255, 255, 255, 0.52);
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: "DM Sans", sans-serif;
+        background: var(--cream);
+        min-height: 100vh;
+        overflow-x: hidden;
+        position: relative;
+      }
+
+      /* bg blobs */
+      .bg-blob {
+        position: fixed;
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 0;
+        filter: blur(70px);
+        opacity: 0.5;
+      }
+      .bg-blob.b1 {
+        width: 520px;
+        height: 520px;
+        top: -200px;
+        left: -200px;
+        background: #f9c5d8;
+      }
+      .bg-blob.b2 {
+        width: 440px;
+        height: 440px;
+        bottom: -160px;
+        right: -160px;
+        background: #fad4e8;
+      }
+      .bg-blob.b3 {
+        width: 300px;
+        height: 300px;
+        top: 40%;
+        left: 55%;
+        transform: translate(-50%, -50%);
+        background: #fde8d0;
+      }
+
+      /* grain */
+      body::after {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: 1;
+        pointer-events: none;
+        opacity: 0.035;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        background-size: 180px;
+      }
+
+      /* floating hearts */
+      .fh {
+        position: fixed;
+        pointer-events: none;
+        z-index: 2;
+        animation: fhA 6s linear forwards;
+      }
+      @keyframes fhA {
+        0% {
+          transform: translateY(0) rotate(-8deg);
+          opacity: 0.9;
+        }
+        100% {
+          transform: translateY(-105vh) rotate(14deg);
+          opacity: 0;
+        }
+      }
+
+      /* flash */
+      .flash-ol {
+        position: fixed;
+        inset: 0;
+        z-index: 999;
+        background: white;
+        opacity: 0;
+        pointer-events: none;
+      }
+      .flash-ol.go {
+        animation: flashA 0.35s ease-out forwards;
+      }
+      @keyframes flashA {
+        0% {
+          opacity: 0.92;
+        }
+        100% {
+          opacity: 0;
+        }
+      }
+
+      /* countdown */
+      .cd-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(240, 100, 140, 0.06);
+        backdrop-filter: blur(2px);
+        pointer-events: none;
+      }
+      .cd-num {
+        font-family: "Cormorant Garamond", serif;
+        font-size: 200px;
+        font-weight: 600;
+        color: var(--rose);
+        opacity: 0;
+        text-shadow: 0 8px 50px rgba(232, 87, 122, 0.3);
+      }
+      .cd-num.show {
+        animation: cdAnim 0.75s ease forwards;
+      }
+      @keyframes cdAnim {
+        0% {
+          opacity: 0;
+          transform: scale(1.5);
+        }
+        30% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        70% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        100% {
+          opacity: 0;
+          transform: scale(0.7);
+        }
+      }
+
+      /* ── SCREEN SYSTEM ── */
+      .screen {
+        display: none;
+        position: relative;
+        z-index: 10;
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+      }
+      .screen.active {
+        display: flex;
+        animation: fadeUp 0.55s ease both;
+      }
+      @keyframes fadeUp {
+        from {
+          opacity: 0;
+          transform: translateY(22px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      /* back button shared */
+      .back-btn {
+        align-self: flex-start;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(255, 255, 255, 0.72);
+        border: 1.5px solid #f0c0d8;
+        border-radius: 20px;
+        padding: 7px 16px;
+        font-family: "DM Sans", sans-serif;
+        font-size: 13px;
+        color: var(--rose);
+        cursor: pointer;
+        font-weight: 500;
+        margin-bottom: 16px;
+        transition:
+          background 0.2s,
+          transform 0.15s;
+        backdrop-filter: blur(10px);
+      }
+      .back-btn:hover {
+        background: var(--petal);
+        transform: translateX(-3px);
+      }
+
+      /* shared section header */
+      .screen-title {
+        font-family: "Cormorant Garamond", serif;
+        font-size: clamp(26px, 6vw, 34px);
+        font-weight: 600;
+        color: var(--ink);
+        margin-bottom: 2px;
+        text-align: center;
+      }
+      .screen-title em {
+        font-style: italic;
+        color: var(--rose);
+      }
+      .screen-sub {
+        font-size: 11px;
+        letter-spacing: 2.5px;
+        text-transform: uppercase;
+        color: #b07090;
+        margin-bottom: 18px;
+        text-align: center;
+      }
+
+      /* shared controls card */
+      .ctrl-card {
+        width: 100%;
+        background: var(--glass);
+        backdrop-filter: blur(18px);
+        border: 1.5px solid rgba(255, 255, 255, 0.8);
+        border-radius: 26px;
+        padding: 18px;
+        box-shadow: 0 6px 28px rgba(200, 80, 120, 0.1);
+        display: flex;
+        flex-direction: column;
+        gap: 11px;
+        margin-bottom: 14px;
+      }
+      .ctrl-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+      .sel {
+        width: 100%;
+        padding: 11px 15px;
+        border-radius: 14px;
+        border: 1.5px solid #f0c0d8;
+        background: rgba(255, 255, 255, 0.78);
+        font-family: "DM Sans", sans-serif;
+        font-size: 13px;
+        color: var(--ink);
+        outline: none;
+        cursor: pointer;
+        appearance: none;
+        -webkit-appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 12 12'%3E%3Cpath fill='%23e8577a' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 13px center;
+      }
+      .cap-inp {
+        width: 100%;
+        padding: 11px 15px;
+        border-radius: 14px;
+        border: 1.5px solid #f0c0d8;
+        background: rgba(255, 255, 255, 0.78);
+        font-family: "DM Sans", sans-serif;
+        font-size: 13px;
+        color: var(--ink);
+        outline: none;
+      }
+      .cap-inp:focus,
+      .sel:focus {
+        border-color: var(--rose);
+      }
+
+      /* shared shoot button */
+      .shoot-btn {
+        width: 100%;
+        padding: 16px;
+        border-radius: 20px;
+        border: none;
+        background: linear-gradient(135deg, #f07098, #e8577a, #c0406a);
+        color: white;
+        font-family: "Cormorant Garamond", serif;
+        font-size: 20px;
+        font-style: italic;
+        letter-spacing: 0.5px;
+        cursor: pointer;
+        box-shadow: 0 6px 22px rgba(232, 87, 122, 0.42);
+        transition:
+          transform 0.2s,
+          box-shadow 0.2s;
+      }
+      .shoot-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 28px rgba(232, 87, 122, 0.52);
+      }
+      .shoot-btn:active {
+        transform: scale(0.97);
+      }
+      .shoot-btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+      }
+
+      /* shared action row */
+      .action-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-top: 12px;
+      }
+      .btn-gen {
+        padding: 12px;
+        border-radius: 16px;
+        border: none;
+        background: linear-gradient(135deg, #f07098, #e8577a);
+        color: white;
+        font-family: "DM Sans", sans-serif;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        box-shadow: 0 4px 14px rgba(232, 87, 122, 0.32);
+        transition:
+          transform 0.2s,
+          box-shadow 0.2s;
+      }
+      .btn-gen:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(232, 87, 122, 0.42);
+      }
+      .btn-dl {
+        padding: 12px;
+        border-radius: 16px;
+        border: 1.5px solid #f0c0d8;
+        background: rgba(255, 255, 255, 0.85);
+        color: var(--rose);
+        font-family: "DM Sans", sans-serif;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition:
+          background 0.2s,
+          transform 0.2s;
+      }
+      .btn-dl:hover {
+        background: var(--petal);
+        transform: translateY(-1px);
+      }
+
+      /* shared thumbnails */
+      .thumbs-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 7px;
+        width: 100%;
+      }
+      .thumb-wrap {
+        position: relative;
+        border-radius: 10px;
+        overflow: visible;
+      }
+      .thumb-wrap img {
+        width: 100%;
+        border-radius: 10px;
+        border: 2.5px solid white;
+        box-shadow: 0 3px 10px rgba(200, 80, 120, 0.15);
+        display: block;
+        object-fit: cover;
+      }
+      .del-btn {
+        position: absolute;
+        top: -7px;
+        right: -7px;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: #e8577a;
+        color: white;
+        border: 2px solid white;
+        font-size: 9px;
+        font-weight: 700;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 6px rgba(200, 80, 120, 0.4);
+        transition:
+          transform 0.15s,
+          background 0.15s;
+        z-index: 10;
+      }
+      .del-btn:hover {
+        background: #c0406a;
+        transform: scale(1.18);
+      }
+
+      /* shared strip wrap */
+      .strip-result {
+        display: none;
+        background: white;
+        border-radius: 22px;
+        padding: 14px;
+        width: 100%;
+        box-shadow: 0 10px 36px rgba(200, 80, 120, 0.14);
+        border: 1.5px solid rgba(255, 200, 220, 0.4);
+        margin-top: 14px;
+      }
+      .strip-result canvas {
+        width: 100%;
+        height: auto;
+        border-radius: 10px;
+        display: block;
+      }
+
+      .photo-status {
+        text-align: center;
+        font-size: 12px;
+        color: #b07090;
+        margin-bottom: 8px;
+        letter-spacing: 0.3px;
+      }
+
+      /* ════════════ HOME ════════════ */
+      #screen-home {
+        justify-content: center;
+        min-height: 100vh;
+        padding: 32px 20px;
+      }
+
+      .wordmark {
+        font-family: "Cormorant Garamond", serif;
+        font-size: clamp(56px, 14vw, 88px);
+        font-weight: 300;
+        letter-spacing: -2px;
+        color: var(--ink);
+        line-height: 0.92;
+        margin-bottom: 8px;
+        text-align: center;
+      }
+      .wordmark em {
+        font-style: italic;
+        color: var(--rose);
+      }
+      .home-tag {
+        font-size: 11px;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        color: #b07090;
+        margin-bottom: 52px;
+        font-weight: 500;
+      }
+
+      .cards {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+        width: 100%;
+        max-width: 520px;
+        margin-bottom: 32px;
+      }
+      .card {
+        position: relative;
+        background: var(--glass);
+        backdrop-filter: blur(20px);
+        border: 1.5px solid rgba(255, 255, 255, 0.82);
+        border-radius: 28px;
+        padding: 32px 18px 28px;
+        cursor: pointer;
+        overflow: hidden;
+        transition:
+          transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+          box-shadow 0.25s;
+        box-shadow: 0 8px 32px rgba(200, 80, 120, 0.1);
+        text-align: center;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .card:hover {
+        transform: translateY(-7px) scale(1.02);
+        box-shadow: 0 22px 54px rgba(200, 80, 120, 0.22);
+      }
+      .card:active {
+        transform: scale(0.96);
+      }
+      .card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 16px;
+        right: 16px;
+        height: 3px;
+        border-radius: 0 0 4px 4px;
+        background: linear-gradient(90deg, var(--blush), var(--rose));
+        opacity: 0;
+        transition: opacity 0.25s;
+      }
+      .card:hover::before {
+        opacity: 1;
+      }
+      .card::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: 28px;
+        background: radial-gradient(
+          circle at 50% 0%,
+          rgba(242, 167, 195, 0.18) 0%,
+          transparent 70%
+        );
+        opacity: 0;
+        transition: opacity 0.3s;
+      }
+      .card:hover::after {
+        opacity: 1;
+      }
+      .card-icon {
+        font-size: 46px;
+        line-height: 1;
+        margin-bottom: 14px;
+        display: block;
+        transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      }
+      .card:hover .card-icon {
+        transform: scale(1.2) rotate(-5deg);
+      }
+      .card-title {
+        font-family: "Cormorant Garamond", serif;
+        font-size: 22px;
+        font-weight: 600;
+        color: var(--ink);
+        line-height: 1.1;
+        margin-bottom: 7px;
+      }
+      .card-title em {
+        font-style: italic;
+        color: var(--rose);
+      }
+      .card-desc {
+        font-size: 12px;
+        color: #9a6070;
+        line-height: 1.55;
+      }
+      .badge {
+        position: absolute;
+        top: 13px;
+        right: 13px;
+        background: linear-gradient(135deg, #f07098, #e8577a);
+        color: white;
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 1.2px;
+        text-transform: uppercase;
+        padding: 3px 9px;
+        border-radius: 20px;
+      }
+      .home-note {
+        font-size: 11px;
+        color: #c090a8;
+        letter-spacing: 0.3px;
+        max-width: 320px;
+        text-align: center;
+        line-height: 1.6;
+      }
+
+      /* ════════════ SOLO ════════════ */
+      #screen-solo {
+        padding: 20px 16px 50px;
+        overflow-y: auto;
+        max-height: 100vh;
+      }
+
+      .vid-frame {
+        width: 100%;
+        border-radius: 24px;
+        overflow: hidden;
+        aspect-ratio: 4/3;
+        background: #f0d8e8;
+        box-shadow: 0 14px 44px rgba(200, 80, 120, 0.22);
+        border: 2.5px solid rgba(255, 255, 255, 0.9);
+        margin-bottom: 14px;
+      }
+      .vid-frame video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transform: scaleX(-1);
+        display: block;
+      }
+
+      /* ════════════ BESTIE ════════════ */
+      #screen-bestie-lobby {
+        padding: 30px 20px;
+        min-height: 100vh;
+        justify-content: center;
+      }
+      #screen-bestie-booth {
+        padding: 20px 16px 50px;
+        overflow-y: auto;
+        max-height: 100vh;
+      }
+
+      .lobby-card {
+        background: var(--glass);
+        backdrop-filter: blur(24px);
+        border: 1.5px solid rgba(255, 255, 255, 0.78);
+        border-radius: 36px;
+        padding: 42px 38px;
+        max-width: 460px;
+        width: 100%;
+        box-shadow: 0 24px 70px rgba(200, 80, 120, 0.14);
+        text-align: center;
+      }
+      .lbl {
+        font-size: 10px;
+        letter-spacing: 1.8px;
+        text-transform: uppercase;
+        color: #b06080;
+        font-weight: 600;
+        text-align: left;
+        margin-bottom: 7px;
+        display: block;
+      }
+      .inp {
+        width: 100%;
+        padding: 13px 17px;
+        border-radius: 16px;
+        border: 1.5px solid #f0c0d8;
+        background: rgba(255, 255, 255, 0.75);
+        font-family: "DM Sans", sans-serif;
+        font-size: 15px;
+        color: var(--ink);
+        outline: none;
+        transition:
+          border-color 0.2s,
+          box-shadow 0.2s;
+        margin-bottom: 14px;
+      }
+      .inp:focus {
+        border-color: var(--rose);
+        box-shadow: 0 0 0 3px rgba(232, 87, 122, 0.12);
+      }
+      .btn {
+        width: 100%;
+        padding: 14px;
+        border-radius: 20px;
+        border: none;
+        font-family: "DM Sans", sans-serif;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        transition:
+          transform 0.2s,
+          box-shadow 0.2s;
+      }
+      .btn:active {
+        transform: scale(0.97);
+      }
+      .btn-primary {
+        background: linear-gradient(135deg, #f07098, #e8577a, #c0406a);
+        color: white;
+        box-shadow: 0 6px 22px rgba(232, 87, 122, 0.42);
+      }
+      .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 30px rgba(232, 87, 122, 0.52);
+      }
+      .btn-outline {
+        background: rgba(255, 255, 255, 0.8);
+        color: var(--rose);
+        border: 1.5px solid #f0c0d8;
+        margin-top: 10px;
+      }
+      .btn-outline:hover {
+        background: var(--soft);
+        transform: translateY(-1px);
+      }
+      .divider {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin: 24px 0;
+        color: #d0a0b8;
+        font-size: 13px;
+      }
+      .divider::before,
+      .divider::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, #e0b0c8, transparent);
+      }
+      .code-box {
+        background: var(--soft);
+        border: 1.5px dashed #e0a0c0;
+        border-radius: 18px;
+        padding: 16px;
+        margin: 14px 0;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+      .code-box:hover {
+        background: #f8d0e4;
+      }
+      .code-val {
+        font-family: "Cormorant Garamond", serif;
+        font-size: 34px;
+        font-weight: 600;
+        color: var(--rose);
+        letter-spacing: 8px;
+      }
+      .code-hint {
+        display: block;
+        font-size: 11px;
+        letter-spacing: 1px;
+        color: #c080a0;
+        margin-top: 4px;
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 7px 16px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 500;
+        margin-top: 14px;
+      }
+      .pill.wait {
+        background: #fff3e0;
+        color: #d06010;
+      }
+      .pill.ok {
+        background: #e8f5e9;
+        color: #2e7d32;
+      }
+      .pill.err {
+        background: #fce4ec;
+        color: #c62828;
+      }
+      .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: currentColor;
+      }
+      .dot.pulse {
+        animation: pulse 1.4s ease-in-out infinite;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.4;
+          transform: scale(0.65);
+        }
+      }
+
+      /* together frame */
+      .together-frame {
+        width: 100%;
+        max-width: 680px;
+        position: relative;
+        border-radius: 26px;
+        overflow: hidden;
+        background: #f0d8e8;
+        box-shadow: 0 16px 50px rgba(200, 80, 120, 0.24);
+        border: 3px solid rgba(255, 255, 255, 0.9);
+        aspect-ratio: 16/9;
+        margin-bottom: 16px;
+      }
+      .together-frame .half {
+        position: absolute;
+        top: 0;
+        height: 100%;
+        width: 50%;
+        overflow: hidden;
+      }
+      .together-frame .half.left {
+        left: 0;
+      }
+      .together-frame .half.right {
+        right: 0;
+      }
+      .together-frame video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transform: scaleX(-1);
+      }
+      .seam {
+        position: absolute;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 48px;
+        height: 100%;
+        z-index: 3;
+        pointer-events: none;
+        background: linear-gradient(
+          to right,
+          rgba(253, 245, 240, 0) 0%,
+          rgba(253, 245, 240, 0.18) 40%,
+          rgba(253, 245, 240, 0.18) 60%,
+          rgba(253, 245, 240, 0) 100%
+        );
+      }
+      .name-tag {
+        position: absolute;
+        bottom: 14px;
+        z-index: 5;
+        background: rgba(255, 255, 255, 0.72);
+        backdrop-filter: blur(8px);
+        border-radius: 20px;
+        padding: 4px 14px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--deep);
+        letter-spacing: 0.3px;
+        pointer-events: none;
+      }
+      .name-tag.left-tag {
+        left: 14px;
+      }
+      .name-tag.right-tag {
+        right: 14px;
+      }
+      .waiting-overlay {
+        position: absolute;
+        inset: 0;
+        z-index: 4;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: rgba(240, 216, 232, 0.65);
+        backdrop-filter: blur(4px);
+      }
+      .waiting-overlay .w-icon {
+        font-size: 32px;
+        margin-bottom: 8px;
+      }
+      .waiting-overlay .w-text {
+        font-size: 13px;
+        color: var(--deep);
+        font-weight: 500;
+        letter-spacing: 0.5px;
+      }
+
+      .strip-area {
+        width: 100%;
+        max-width: 680px;
+        margin-top: 18px;
+      }
+
+      @media (max-width: 480px) {
+        .cards {
+          grid-template-columns: 1fr;
+        }
+        .wordmark {
+          font-size: 54px;
+        }
+        .ctrl-row {
+          grid-template-columns: 1fr;
+        }
+        .together-frame {
+          aspect-ratio: 4/3;
+        }
+        .cd-num {
+          font-size: 130px;
+        }
+        .lobby-card {
+          padding: 30px 22px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="bg-blob b1"></div>
+    <div class="bg-blob b2"></div>
+    <div class="bg-blob b3"></div>
+    <div class="flash-ol" id="flashOl"></div>
+
+    <!-- ════════════ HOME ════════════ -->
+    <div id="screen-home" class="screen active">
+      <div class="wordmark">Blush<em>Booth</em></div>
+      <div class="home-tag">✦ your pocket photo studio ✦</div>
+
+      <div class="cards">
+        <div class="card" onclick="showScreen('solo')">
+          <span class="card-icon">🪞</span>
+          <div class="card-title">Solo<br /><em>Session</em></div>
+          <p class="card-desc">
+            Just you, your vibe & a cute strip to keep forever.
+          </p>
+        </div>
+        <div class="card" onclick="showScreen('bestie-lobby')">
+          <div class="badge">Live ✦</div>
+          <span class="card-icon">💌</span>
+          <div class="card-title">Bestie<br /><em>Booth</em></div>
+          <p class="card-desc">
+            Same frame, different cities. Photo date with your person.
+          </p>
+        </div>
+      </div>
+
+      <p class="home-note">
+        No sign-up · No uploads · Everything stays on your device 🌸
+      </p>
+    </div>
+
+    <!-- ════════════ SOLO ════════════ -->
+    <div id="screen-solo" class="screen">
+      <div style="width: 100%; max-width: 480px; padding: 0 4px">
+        <button class="back-btn" onclick="goHome('solo')">← Back</button>
+        <div class="screen-title">Solo <em>Session</em></div>
+        <div class="screen-sub">📸 retro blush</div>
+
+        <div class="vid-frame">
+          <video id="soloVid" autoplay muted playsinline></video>
+        </div>
+
+        <div class="ctrl-card">
+          <div class="ctrl-row">
+            <select class="sel" id="soloFilter" onchange="soloFilterChange()">
+              <option value="none">🎞 Normal</option>
+              <option value="grayscale(100%)">🖤 B&W</option>
+              <option value="sepia(100%)">🌿 Vintage</option>
+              <option value="brightness(1.2) contrast(1.1)">
+                ✨ Soft Glow
+              </option>
+              <option value="contrast(1.5) saturate(1.3)">🌈 Vivid Pop</option>
+              <option value="hue-rotate(30deg) saturate(1.4)">
+                🌸 Rose Tint
+              </option>
+              <option value="brightness(.85) contrast(1.2) saturate(.8)">
+                🌙 Moody
+              </option>
+            </select>
+            <select class="sel" id="soloLayout">
+              <option value="strip">📸 Vertical Strip</option>
+              <option value="grid">🔲 2×2 Grid</option>
+            </select>
+          </div>
+          <input
+            class="cap-inp"
+            id="soloCaption"
+            placeholder="Add a cute caption 💕"
+            maxlength="60"
+          />
+          <button class="shoot-btn" onclick="soloCapture()">
+            📸 &nbsp;Capture Photo
+          </button>
+        </div>
+
+        <div class="photo-status" id="soloStatus">
+          Take 4 photos to build your strip!
+        </div>
+        <div class="thumbs-grid" id="soloThumbs"></div>
+
+        <div class="action-row">
+          <button class="btn-gen" onclick="soloGenerate()">
+            Generate Strip 🎞
+          </button>
+          <button class="btn-dl" onclick="soloDownload()">Download 💾</button>
+        </div>
+
+        <div class="strip-result" id="soloStripWrap">
+          <canvas id="soloCanvas"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════ BESTIE LOBBY ════════════ -->
+    <div id="screen-bestie-lobby" class="screen">
+      <button class="back-btn" onclick="goHome('bestie-lobby')">← Back</button>
+      <div class="lobby-card">
+        <div class="screen-title" style="margin-bottom: 4px">
+          Bestie<em>Booth</em>
+        </div>
+        <div class="screen-sub" style="margin-bottom: 30px">
+          📸 together, no distance 💌
+        </div>
+
+        <label class="lbl">Your name</label>
+        <input
+          class="inp"
+          id="myName"
+          placeholder="e.g. Priya"
+          maxlength="18"
+        />
+        <button class="btn btn-primary" onclick="createRoom()">
+          ✨ Create a Room
+        </button>
+
+        <div class="divider">or join your bestie's room</div>
+
+        <label class="lbl">Room code</label>
+        <input
+          class="inp"
+          id="joinCode"
+          placeholder="Enter 6-letter code"
+          maxlength="6"
+          oninput="this.value = this.value.toUpperCase()"
+        />
+        <button class="btn btn-outline" onclick="joinRoom()">
+          Join Room →
+        </button>
+
+        <div id="lobbyStatus"></div>
+      </div>
+    </div>
+
+    <!-- ════════════ BESTIE BOOTH ════════════ -->
+    <div id="screen-bestie-booth" class="screen">
+      <div style="width: 100%; max-width: 700px; padding: 0 4px">
+        <button class="back-btn" onclick="goHome('bestie-booth')">
+          ← Back
+        </button>
+        <div class="screen-title" id="boothTitle">BestieBooth 💌</div>
+        <div class="screen-sub" id="boothNames">connecting…</div>
+
+        <div class="together-frame">
+          <div class="half left">
+            <video id="myVid" autoplay muted playsinline></video>
+          </div>
+          <div class="half right">
+            <video id="friendVid" autoplay playsinline></video>
+            <div class="waiting-overlay" id="waitingOl">
+              <div class="w-icon">🌸</div>
+              <div class="w-text">Waiting for bestie…</div>
+            </div>
+          </div>
+          <div class="seam"></div>
+          <div class="name-tag left-tag" id="myTag">You 💖</div>
+          <div class="name-tag right-tag" id="friendTag">Bestie 🌸</div>
+        </div>
+
+        <div class="ctrl-card">
+          <div class="ctrl-row">
+            <select class="sel" id="bFilter" onchange="applyFilter()">
+              <option value="none">🎞 Normal</option>
+              <option value="grayscale(100%)">🖤 B&W</option>
+              <option value="sepia(100%)">🌿 Vintage</option>
+              <option value="brightness(1.2) contrast(1.1)">
+                ✨ Soft Glow
+              </option>
+              <option value="contrast(1.5) saturate(1.3)">🌈 Vivid Pop</option>
+              <option value="hue-rotate(30deg) saturate(1.4)">
+                🌸 Rose Tint
+              </option>
+              <option value="brightness(.85) contrast(1.2) saturate(.8)">
+                🌙 Moody
+              </option>
+            </select>
+            <select class="sel" id="bLayout">
+              <option value="strip">📸 Vertical Strip</option>
+              <option value="wide">🖼 Wide Strip</option>
+            </select>
+          </div>
+          <input
+            class="cap-inp"
+            id="bCaption"
+            placeholder="Add a cute caption 💕"
+            maxlength="60"
+          />
+          <button
+            class="shoot-btn"
+            id="shootBtn"
+            onclick="startCountdown()"
+            disabled
+          >
+            📸 &nbsp;Click Together!
+          </button>
+        </div>
+
+        <div class="strip-area">
+          <div class="photo-status" id="photoStatus">
+            Take 4 photos to build your strip!
+          </div>
+          <div class="thumbs-grid" id="bThumbs"></div>
+          <div class="action-row">
+            <button class="btn-gen" onclick="generateStrip()">
+              Generate Strip 🎞
+            </button>
+            <button class="btn-dl" onclick="downloadStrip()">
+              Download 💾
+            </button>
+          </div>
+          <div class="strip-result" id="bStripWrap">
+            <canvas id="bStrip"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      /* ════════════════════════════════
+   SCREEN MANAGER
+════════════════════════════════ */
+      function showScreen(name) {
+        document.querySelectorAll(".screen").forEach((s) => {
+          s.classList.remove("active");
+          s.style.display = "none";
+        });
+        const el = document.getElementById("screen-" + name);
+        el.style.display = "flex";
+        requestAnimationFrame(() => el.classList.add("active"));
+      }
+
+      function goHome(from) {
+        if (from === "solo") stopSoloCamera();
+        if (from === "bestie-lobby" || from === "bestie-booth") stopBestie();
+        showScreen("home");
+      }
+
+      /* ════════════════════════════════
+   FLOATING HEARTS
+════════════════════════════════ */
+      setInterval(() => {
+        const h = document.createElement("div");
+        h.className = "fh";
+        h.innerText = ["💖", "🌸", "💕", "✨", "🎀"][
+          Math.floor(Math.random() * 5)
+        ];
+        h.style.cssText = `left:${Math.random() * 92}vw;bottom:0;font-size:${14 + Math.random() * 14}px`;
+        document.body.appendChild(h);
+        setTimeout(() => h.remove(), 6300);
+      }, 1400);
+
+      function doFlash() {
+        const f = document.getElementById("flashOl");
+        f.classList.add("go");
+        setTimeout(() => f.classList.remove("go"), 380);
+      }
+
+      function rr(ctx, x, y, w, h, r) {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + w - r, y);
+        ctx.arcTo(x + w, y, x + w, y + r, r);
+        ctx.lineTo(x + w, y + h - r);
+        ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+        ctx.lineTo(x + r, y + h);
+        ctx.arcTo(x, y + h, x, y + h - r, r);
+        ctx.lineTo(x, y + r);
+        ctx.arcTo(x, y, x + r, y, r);
+        ctx.closePath();
+      }
+
+      /* ════════════════════════════════
+   SOLO BOOTH
+════════════════════════════════ */
+      let soloStream = null;
+      let soloPhotos = [];
+
+      showScreen("home"); // init
+
+      async function startSoloCamera() {
+        try {
+          soloStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "user" },
+            audio: false,
+          });
+          document.getElementById("soloVid").srcObject = soloStream;
+        } catch (e) {
+          alert("📸 Camera access needed!\nOpen via HTTPS or localhost.");
+        }
+      }
+
+      function stopSoloCamera() {
+        if (soloStream) {
+          soloStream.getTracks().forEach((t) => t.stop());
+          soloStream = null;
+        }
+        soloPhotos = [];
+        document.getElementById("soloThumbs").innerHTML = "";
+        document.getElementById("soloStripWrap").style.display = "none";
+        document.getElementById("soloStatus").innerText =
+          "Take 4 photos to build your strip!";
+        document.getElementById("soloFilter").value = "none";
+        document.getElementById("soloVid").style.filter = "";
+      }
+
+      // Called when solo card clicked
+      const origShowScreen = showScreen;
+      function showScreen(name) {
+        document.querySelectorAll(".screen").forEach((s) => {
+          s.classList.remove("active");
+          s.style.display = "none";
+        });
+        const el = document.getElementById("screen-" + name);
+        el.style.display = "flex";
+        requestAnimationFrame(() => el.classList.add("active"));
+        if (name === "solo") startSoloCamera();
+      }
+
+      function soloFilterChange() {
+        const f = document.getElementById("soloFilter").value;
+        document.getElementById("soloVid").style.filter = f === "none" ? "" : f;
+      }
+
+      function soloCapture() {
+        if (soloPhotos.length >= 4) {
+          alert("You already have 4 photos 💖 Delete one to retake!");
+          return;
+        }
+        doFlash();
+        const vid = document.getElementById("soloVid");
+        const c = document.createElement("canvas");
+        c.width = 400;
+        c.height = 300;
+        const ctx = c.getContext("2d");
+        const f = document.getElementById("soloFilter").value;
+        if (f !== "none") ctx.filter = f;
+        ctx.save();
+        ctx.scale(-1, 1);
+        ctx.drawImage(vid, -400, 0, 400, 300);
+        ctx.restore();
+
+        const idx = Date.now();
+        soloPhotos.push({ canvas: c, idx });
+        addSoloThumb(c, idx);
+        updateSoloStatus();
+      }
+
+      function addSoloThumb(canvas, idx) {
+        const wrap = document.createElement("div");
+        wrap.className = "thumb-wrap";
+        wrap.dataset.idx = idx;
+        const img = document.createElement("img");
+        img.src = canvas.toDataURL();
+        img.style.aspectRatio = "4/3";
+        const del = document.createElement("button");
+        del.className = "del-btn";
+        del.innerHTML = "✕";
+        del.onclick = (e) => {
+          e.stopPropagation();
+          deleteSoloPhoto(idx);
+        };
+        wrap.appendChild(img);
+        wrap.appendChild(del);
+        document.getElementById("soloThumbs").appendChild(wrap);
+      }
+
+      function deleteSoloPhoto(idx) {
+        soloPhotos = soloPhotos.filter((p) => p.idx !== idx);
+        const w = document.querySelector(`.thumb-wrap[data-idx="${idx}"]`);
+        if (w) w.remove();
+        updateSoloStatus();
+      }
+
+      function updateSoloStatus() {
+        const n = soloPhotos.length;
+        document.getElementById("soloStatus").innerText =
+          n >= 4
+            ? "Strip ready! ✨ Click Generate Strip 🎞"
+            : `Photo ${n} of 4 — ${4 - n} to go 💖`;
+      }
+
+      function soloGenerate() {
+        if (!soloPhotos.length) {
+          alert("Take some photos first 💕");
+          return;
+        }
+        const layout = document.getElementById("soloLayout").value;
+        const caption =
+          document.getElementById("soloCaption").value || "retro blush 💌";
+        const canvas = document.getElementById("soloCanvas");
+        const ctx = canvas.getContext("2d");
+        const PAD = 14;
+
+        if (layout === "strip") {
+          const W = 360,
+            PH = 270,
+            H = PAD + soloPhotos.length * (PH + PAD) + 56;
+          canvas.width = W;
+          canvas.height = H;
+          ctx.fillStyle = "#fff5f8";
+          ctx.fillRect(0, 0, W, H);
+          ctx.strokeStyle = "#f2a7c3";
+          ctx.lineWidth = 5;
+          ctx.strokeRect(3, 3, W - 6, H - 6);
+          let y = PAD;
+          soloPhotos.forEach((p) => {
+            ctx.shadowColor = "rgba(200,80,120,.12)";
+            ctx.shadowBlur = 12;
+            ctx.fillStyle = "white";
+            rr(ctx, PAD, y, W - PAD * 2, PH, 10);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.drawImage(p.canvas, PAD + 3, y + 3, W - PAD * 2 - 6, PH - 6);
+            ctx.fillStyle = "#c090a8";
+            ctx.font = "10px 'DM Sans',sans-serif";
+            ctx.textAlign = "left";
+            ctx.fillText(new Date().toLocaleString(), PAD + 8, y + PH - 7);
+            y += PH + PAD;
+          });
+          ctx.font = "italic 20px 'Cormorant Garamond',serif";
+          ctx.fillStyle = "#e8577a";
+          ctx.textAlign = "center";
+          ctx.fillText(caption, W / 2, H - 18);
+        } else {
+          const CW = 340,
+            PH = 130,
+            GAP = 10,
+            W = CW,
+            H = PAD + (PH + GAP) * 2 + 48;
+          canvas.width = W;
+          canvas.height = H;
+          const grd = ctx.createLinearGradient(0, 0, 0, H);
+          grd.addColorStop(0, "#fff5f8");
+          grd.addColorStop(1, "#fce8f2");
+          ctx.fillStyle = grd;
+          ctx.fillRect(0, 0, W, H);
+          ctx.strokeStyle = "#f2a7c3";
+          ctx.lineWidth = 4;
+          ctx.strokeRect(3, 3, W - 6, H - 6);
+          ctx.fillStyle = "rgba(242,167,195,.45)";
+          for (let i = 0; i < 18; i++) {
+            ctx.beginPath();
+            ctx.arc(
+              Math.random() * W,
+              Math.random() * H,
+              Math.random() * 2.5 + 0.5,
+              0,
+              Math.PI * 2,
+            );
+            ctx.fill();
+          }
+          const cellW = (W - PAD * 3) / 2;
+          soloPhotos.slice(0, 4).forEach((p, i) => {
+            const col = i % 2,
+              row = Math.floor(i / 2),
+              x = PAD + col * (cellW + PAD),
+              y = PAD + row * (PH + GAP);
+            ctx.shadowColor = "rgba(200,80,120,.14)";
+            ctx.shadowBlur = 10;
+            ctx.fillStyle = "white";
+            rr(ctx, x, y, cellW, PH, 8);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.drawImage(p.canvas, x + 2, y + 2, cellW - 4, PH - 4);
+          });
+          ctx.font = "italic 18px 'Cormorant Garamond',serif";
+          ctx.fillStyle = "#e8577a";
+          ctx.textAlign = "center";
+          ctx.fillText(caption, W / 2, H - 16);
+        }
+        document.getElementById("soloStripWrap").style.display = "block";
+        document
+          .getElementById("soloCanvas")
+          .scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+
+      function soloDownload() {
+        const c = document.getElementById("soloCanvas");
+        if (!c.width) {
+          soloGenerate();
+          return;
+        }
+        const a = document.createElement("a");
+        a.download = "blushbooth_solo_" + Date.now() + ".png";
+        a.href = c.toDataURL("image/png");
+        a.click();
+      }
+
+      /* ════════════════════════════════
+   BESTIE BOOTH — PeerJS
+════════════════════════════════ */
+      let peer, conn;
+      let localStream, remoteStream;
+      let bPhotos = [];
+      let myName = "You",
+        friendName = "Bestie";
+      let isHost = false,
+        roomCode = "",
+        countingDown = false;
+      let snapSeq = 0;
+
+      function stopBestie() {
+        if (localStream) {
+          localStream.getTracks().forEach((t) => t.stop());
+          localStream = null;
+        }
+        if (peer) {
+          try {
+            peer.destroy();
+          } catch (e) {}
+          peer = null;
+        }
+        conn = null;
+        bPhotos = [];
+        snapSeq = 0;
+        countingDown = false;
+        isHost = false;
+        document.getElementById("bThumbs").innerHTML = "";
+        document.getElementById("bStripWrap").style.display = "none";
+        document.getElementById("photoStatus").innerText =
+          "Take 4 photos to build your strip!";
+        document.getElementById("waitingOl").style.display = "flex";
+        document.getElementById("shootBtn").disabled = true;
+        document.getElementById("lobbyStatus").innerHTML = "";
+        document.getElementById("myName").value = "";
+        document.getElementById("joinCode").value = "";
+      }
+
+      function setStatus(msg, type = "wait") {
+        document.getElementById("lobbyStatus").innerHTML =
+          `<div class="pill ${type}"><div class="dot ${type !== "ok" ? "pulse" : ""}"></div>${msg}</div>`;
+      }
+
+      async function startBestieCamera() {
+        try {
+          localStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "user" },
+            audio: false,
+          });
+          document.getElementById("myVid").srcObject = localStream;
+          return true;
+        } catch (e) {
+          alert("📸 Camera access needed!\nOpen via HTTPS or localhost.");
+          return false;
+        }
+      }
+
+      function attachRemote(stream) {
+        remoteStream = stream;
+        const vid = document.getElementById("friendVid");
+        vid.srcObject = stream;
+        vid.play().catch(() => {});
+        document.getElementById("waitingOl").style.display = "none";
+        document.getElementById("friendTag").innerText = friendName + " 🌸";
+      }
+
+      function mkPeer(id) {
+        peer = new Peer(id, {
+          host: "0.peerjs.com",
+          port: 443,
+          path: "/",
+          secure: true,
+          debug: 0,
+          config: {
+            iceServers: [
+              { urls: "stun:stun.l.google.com:19302" },
+              { urls: "stun:stun1.l.google.com:19302" },
+              { urls: "stun:global.stun.twilio.com:3478" },
+            ],
+          },
+        });
+        peer.on("error", (e) => {
+          console.error(e);
+          setStatus("⚠️ " + e.type, "err");
+        });
+        peer.on("call", (inc) => {
+          inc.answer(localStream);
+          inc.on("stream", attachRemote);
+        });
+      }
+
+      async function createRoom() {
+        myName = document.getElementById("myName").value.trim() || "You";
+        document.getElementById("myTag").innerText = myName + " 💖";
+        if (!(await startBestieCamera())) return;
+        roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+        isHost = true;
+        mkPeer("bb-h-" + roomCode);
+        peer.on("open", () => {
+          setStatus("Waiting for bestie…", "wait");
+          document.getElementById("lobbyStatus").innerHTML +=
+            `<div class="code-box" onclick="copyCode('${roomCode}')">
+        <div class="code-val">${roomCode}</div>
+        <span class="code-hint">tap to copy 📋</span>
+       </div>`;
+        });
+        peer.on("connection", (c) => {
+          conn = c;
+          bindData();
+          conn.on("open", () => {
+            conn.send({ type: "hello", name: myName });
+            setStatus("Connected 💖", "ok");
+            setTimeout(() => {
+              const out = peer.call("bb-g-" + roomCode, localStream);
+              out.on("stream", attachRemote);
+            }, 600);
+            setTimeout(enterBooth, 900);
+          });
+        });
+      }
+
+      function copyCode(code) {
+        navigator.clipboard.writeText(code).catch(() => {});
+        const h = document.querySelector(".code-hint");
+        if (h) {
+          h.innerText = "Copied! ✨";
+          setTimeout(() => (h.innerText = "tap to copy 📋"), 2000);
+        }
+      }
+
+      async function joinRoom() {
+        myName = document.getElementById("myName").value.trim() || "You";
+        document.getElementById("myTag").innerText = myName + " 💖";
+        const code = document
+          .getElementById("joinCode")
+          .value.trim()
+          .toUpperCase();
+        if (code.length < 4) {
+          setStatus("Enter a valid room code!", "err");
+          return;
+        }
+        roomCode = code;
+        if (!(await startBestieCamera())) return;
+        setStatus("Connecting…", "wait");
+        mkPeer("bb-g-" + roomCode);
+        peer.on("open", () => {
+          conn = peer.connect("bb-h-" + roomCode, { reliable: true });
+          bindData();
+          conn.on("open", () => {
+            conn.send({ type: "hello", name: myName });
+            setStatus("Connected 💖", "ok");
+            setTimeout(enterBooth, 900);
+          });
+        });
+      }
+
+      function bindData() {
+        conn.on("data", (d) => {
+          if (d.type === "hello") {
+            friendName = d.name || "Bestie";
+            document.getElementById("friendTag").innerText = friendName + " 🌸";
+            document.getElementById("boothNames").innerText =
+              myName + " & " + friendName;
+          }
+          if (d.type === "filter") {
+            document.getElementById("bFilter").value = d.value;
+            const v = d.value === "none" ? "" : d.value;
+            document.getElementById("myVid").style.filter = v;
+            document.getElementById("friendVid").style.filter = v;
+          }
+          if (d.type === "countdown") {
+            if (d.seq !== undefined) snapSeq = d.seq;
+            countingDown = true;
+            document.getElementById("shootBtn").disabled = true;
+            runCountdown(d.num);
+          }
+          if (d.type === "snap") receiveSnap(d.imgData, d.seq);
+          if (d.type === "delete") {
+            if (bPhotos[d.seq])
+              bPhotos[d.seq] = { mine: null, theirs: null, combined: null };
+            snapSeq = d.seq;
+            const w = document.querySelector(
+              `.thumb-wrap[data-seq="${d.seq}"]`,
+            );
+            if (w) w.remove();
+            updateBStatus();
+            if (bCompletedCount() < 4)
+              document.getElementById("shootBtn").disabled = false;
+          }
+        });
+        conn.on("close", () => setStatus("Friend disconnected 💔", "err"));
+        conn.on("error", console.error);
+      }
+
+      function enterBooth() {
+        showScreen("bestie-booth");
+        document.getElementById("boothNames").innerText =
+          myName + " & " + friendName;
+        document.getElementById("shootBtn").disabled = false;
+      }
+
+      function applyFilter() {
+        const f = document.getElementById("bFilter").value;
+        const v = f === "none" ? "" : f;
+        document.getElementById("myVid").style.filter = v;
+        document.getElementById("friendVid").style.filter = v;
+        if (conn?.open) conn.send({ type: "filter", value: f });
+      }
+
+      /* countdown */
+      function startCountdown() {
+        if (countingDown || bCompletedCount() >= 4) return;
+        countingDown = true;
+        document.getElementById("shootBtn").disabled = true;
+        syncCountdown(3);
+      }
+      function syncCountdown(n) {
+        if (conn?.open) conn.send({ type: "countdown", num: n, seq: snapSeq });
+        runCountdown(n);
+      }
+      function runCountdown(n) {
+        const ov = document.createElement("div");
+        ov.className = "cd-overlay";
+        const nm = document.createElement("div");
+        nm.className = "cd-num";
+        nm.innerText = n;
+        ov.appendChild(nm);
+        document.body.appendChild(ov);
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => nm.classList.add("show")),
+        );
+        setTimeout(() => {
+          ov.remove();
+          if (n > 1) {
+            isHost ? syncCountdown(n - 1) : runCountdown(n - 1);
+          } else {
+            setTimeout(() => {
+              doFlash();
+              captureFrame();
+            }, 300);
+          }
+        }, 900);
+      }
+
+      /* capture */
+      function captureFrame() {
+        const vid = document.getElementById("myVid");
+        const c = document.createElement("canvas");
+        c.width = 400;
+        c.height = 300;
+        const ctx = c.getContext("2d");
+        const f = document.getElementById("bFilter").value;
+        if (f !== "none") ctx.filter = f;
+        ctx.save();
+        ctx.scale(-1, 1);
+        ctx.drawImage(vid, -400, 0, 400, 300);
+        ctx.restore();
+        const imgData = c.toDataURL("image/jpeg", 0.85);
+        const seq = snapSeq;
+        if (conn?.open) conn.send({ type: "snap", imgData, seq });
+        if (!bPhotos[seq])
+          bPhotos[seq] = { mine: null, theirs: null, combined: null };
+        bPhotos[seq].mine = c;
+        tryFinalize(seq);
+      }
+
+      function receiveSnap(imgData, seq) {
+        if (!bPhotos[seq])
+          bPhotos[seq] = { mine: null, theirs: null, combined: null };
+        const img = new Image();
+        img.onload = () => {
+          const c = document.createElement("canvas");
+          c.width = 400;
+          c.height = 300;
+          c.getContext("2d").drawImage(img, 0, 0, 400, 300);
+          bPhotos[seq].theirs = c;
+          tryFinalize(seq);
+        };
+        img.src = imgData;
+      }
+
+      function tryFinalize(seq) {
+        const p = bPhotos[seq];
+        if (!p?.mine || !p?.theirs) return;
+        const combined = buildCombined(p.mine, p.theirs);
+        p.combined = combined;
+        addBThumb(combined, seq);
+        updateBStatus();
+        snapSeq = seq + 1;
+        countingDown = false;
+        if (bCompletedCount() < 4)
+          document.getElementById("shootBtn").disabled = false;
+      }
+
+      function buildCombined(left, right) {
+        const W = 800,
+          H = 300,
+          c = document.createElement("canvas");
+        c.width = W;
+        c.height = H;
+        const ctx = c.getContext("2d");
+        ctx.drawImage(left, 0, 0, W / 2, H);
+        ctx.drawImage(right, W / 2, 0, W / 2, H);
+        const g = ctx.createLinearGradient(W / 2 - 18, 0, W / 2 + 18, 0);
+        g.addColorStop(0, "rgba(253,245,240,0)");
+        g.addColorStop(0.45, "rgba(253,245,240,.22)");
+        g.addColorStop(0.55, "rgba(253,245,240,.22)");
+        g.addColorStop(1, "rgba(253,245,240,0)");
+        ctx.fillStyle = g;
+        ctx.fillRect(W / 2 - 18, 0, 36, H);
+        return c;
+      }
+
+      function bCompletedCount() {
+        return bPhotos.filter((p) => p && p.combined).length;
+      }
+
+      function addBThumb(canvas, seq) {
+        const old = document.querySelector(`.thumb-wrap[data-seq="${seq}"]`);
+        if (old) old.remove();
+        const wrap = document.createElement("div");
+        wrap.className = "thumb-wrap";
+        wrap.dataset.seq = seq;
+        const img = document.createElement("img");
+        img.src = canvas.toDataURL();
+        img.style.aspectRatio = "16/9";
+        const del = document.createElement("button");
+        del.className = "del-btn";
+        del.innerHTML = "✕";
+        del.onclick = (e) => {
+          e.stopPropagation();
+          deleteBPhoto(seq);
+        };
+        wrap.appendChild(img);
+        wrap.appendChild(del);
+        document.getElementById("bThumbs").appendChild(wrap);
+      }
+
+      function deleteBPhoto(seq) {
+        bPhotos[seq] = { mine: null, theirs: null, combined: null };
+        snapSeq = seq;
+        const w = document.querySelector(`.thumb-wrap[data-seq="${seq}"]`);
+        if (w) w.remove();
+        updateBStatus();
+        document.getElementById("shootBtn").disabled = false;
+        if (conn?.open) conn.send({ type: "delete", seq });
+      }
+
+      function updateBStatus() {
+        const done = bCompletedCount();
+        document.getElementById("photoStatus").innerText =
+          done >= 4
+            ? "Strip ready! ✨ Click Generate Strip 🎞"
+            : `Photo ${done} of 4 taken 💖`;
+      }
+
+      function generateStrip() {
+        const done = bPhotos.filter((p) => p && p.combined);
+        if (!done.length) {
+          alert("Take some photos first 💕");
+          return;
+        }
+        const layout = document.getElementById("bLayout").value;
+        const caption =
+          document.getElementById("bCaption").value ||
+          myName + " & " + friendName + " 💌";
+        const canvas = document.getElementById("bStrip");
+        const ctx = canvas.getContext("2d");
+        const PAD = 16,
+          PHOTO_W = 760,
+          PHOTO_H = Math.round((PHOTO_W * 300) / 800);
+
+        const W = PHOTO_W + PAD * 2,
+          H = PAD + done.length * (PHOTO_H + PAD) + 56;
+        canvas.width = W;
+        canvas.height = H;
+
+        if (layout === "strip") {
+          ctx.fillStyle = "#fff5f8";
+          ctx.fillRect(0, 0, W, H);
+          ctx.strokeStyle = "#f2a7c3";
+          ctx.lineWidth = 5;
+          ctx.strokeRect(3, 3, W - 6, H - 6);
+          let y = PAD;
+          done.forEach((p) => {
+            ctx.shadowColor = "rgba(200,80,120,.12)";
+            ctx.shadowBlur = 14;
+            ctx.fillStyle = "white";
+            rr(ctx, PAD, y, PHOTO_W, PHOTO_H, 10);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.drawImage(p.combined, PAD + 3, y + 3, PHOTO_W - 6, PHOTO_H - 6);
+            ctx.fillStyle = "#c090a8";
+            ctx.font = "11px 'DM Sans',sans-serif";
+            ctx.textAlign = "left";
+            ctx.fillText(
+              new Date().toLocaleString(),
+              PAD + 10,
+              y + PHOTO_H - 8,
+            );
+            y += PHOTO_H + PAD;
+          });
+          ctx.font = "italic 24px 'Cormorant Garamond',serif";
+          ctx.fillStyle = "#e8577a";
+          ctx.textAlign = "center";
+          ctx.fillText(caption, W / 2, H - 18);
+        } else {
+          const grd = ctx.createLinearGradient(0, 0, 0, H);
+          grd.addColorStop(0, "#fff5f8");
+          grd.addColorStop(1, "#fce8f2");
+          ctx.fillStyle = grd;
+          ctx.fillRect(0, 0, W, H);
+          ctx.fillStyle = "rgba(242,167,195,.4)";
+          for (let i = 0; i < 28; i++) {
+            ctx.beginPath();
+            ctx.arc(
+              Math.random() * W,
+              Math.random() * H,
+              Math.random() * 3 + 1,
+              0,
+              Math.PI * 2,
+            );
+            ctx.fill();
+          }
+          ctx.strokeStyle = "#e8a0bf";
+          ctx.lineWidth = 4;
+          ctx.strokeRect(3, 3, W - 6, H - 6);
+          let y = PAD;
+          done.forEach((p) => {
+            ctx.shadowColor = "rgba(200,80,120,.15)";
+            ctx.shadowBlur = 16;
+            ctx.fillStyle = "white";
+            rr(ctx, PAD, y, PHOTO_W, PHOTO_H, 12);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.drawImage(p.combined, PAD + 3, y + 3, PHOTO_W - 6, PHOTO_H - 6);
+            y += PHOTO_H + PAD;
+          });
+          ctx.font = "italic 26px 'Cormorant Garamond',serif";
+          ctx.fillStyle = "#e8577a";
+          ctx.textAlign = "center";
+          ctx.fillText(caption, W / 2, H - 18);
+        }
+        document.getElementById("bStripWrap").style.display = "block";
+        document
+          .getElementById("bStrip")
+          .scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+
+      function downloadStrip() {
+        const c = document.getElementById("bStrip");
+        if (!c.width) {
+          generateStrip();
+          return;
+        }
+        const a = document.createElement("a");
+        a.download = "blushbooth_bestie_" + Date.now() + ".png";
+        a.href = c.toDataURL("image/png");
+        a.click();
+      }
+    </script>
+  </body>
+</html>
