@@ -642,20 +642,22 @@ function bindData() {
       document.getElementById("friendVid").style.filter = v;
     }
     if (d.type === "countdown") {
+      // Host sends the current snapSeq along with countdown start so guest stays in sync
+      if (d.seq !== undefined) snapSeq = d.seq;
       countingDown = true;
       document.getElementById("shootBtn").disabled = true;
       runCountdown(d.num);
     }
-    if (d.type === "snap") receiveSnap(d.imgData, d.snapId);
+    if (d.type === "snap") receiveSnap(d.imgData, d.seq);
     if (d.type === "delete") {
-      if (photos[d.idx]) {
-        photos[d.idx] = { mine:null, theirs:null, combined:null, deleted:true };
-        const wrap = document.querySelector(`.thumb-wrap[data-idx="${d.idx}"]`);
-        if (wrap) wrap.remove();
-        updateStatus();
-        const done = photos.filter(p=>p.combined).length;
-        if (done < 4) document.getElementById("shootBtn").disabled = false;
+      if (photos[d.seq]) {
+        photos[d.seq] = { mine:null, theirs:null, combined:null };
+        snapSeq = d.seq;
       }
+      const wrap = document.querySelector(`.thumb-wrap[data-seq="${d.seq}"]`);
+      if (wrap) wrap.remove();
+      updateStatus();
+      if (completedCount() < 4) document.getElementById("shootBtn").disabled = false;
     }
   });
   conn.on("close", () => setStatus("Friend disconnected 💔","err"));
@@ -672,8 +674,7 @@ function enterBooth() {
 
 /* ═══════════ COUNTDOWN ═══════════ */
 function startCountdown() {
-  // BUG FIX: count only COMPLETED photos, not all slots
-  const done = photos.filter(p => p.combined).length;
+  const done = completedCount();
   if (countingDown || done >= 4) return;
   countingDown = true;
   document.getElementById("shootBtn").disabled = true;
@@ -681,7 +682,7 @@ function startCountdown() {
 }
 
 function syncCountdown(n) {
-  if (conn?.open) conn.send({ type:"countdown", num:n });
+  if (conn?.open) conn.send({ type:"countdown", num:n, seq: snapSeq });
   runCountdown(n);
 }
 
@@ -690,7 +691,6 @@ function runCountdown(n) {
   const nm = document.createElement("div"); nm.className = "cd-num"; nm.innerText = n;
   ov.appendChild(nm); document.body.appendChild(ov);
   requestAnimationFrame(()=>requestAnimationFrame(()=>nm.classList.add("show")));
-
   setTimeout(() => {
     ov.remove();
     if (n > 1) {
@@ -708,7 +708,14 @@ function doFlash() {
   setTimeout(()=>f.classList.remove("go"), 400);
 }
 
-/* ═══════════ CAPTURE ═══════════ */
+/* ═══════════ CAPTURE ═══════════
+   KEY INSIGHT: Both sides capture independently at the same moment.
+   We use a shared sequence number (snapSeq) so each side knows
+   which slot to pair incoming friend frames with.
+   Host always sends seq; guest receives it and uses same seq.
+*/
+let snapSeq = 0; // increments each round, shared via data channel
+
 function captureFrame() {
   const vid = document.getElementById("myVid");
   const c = document.createElement("canvas");
@@ -719,51 +726,49 @@ function captureFrame() {
   ctx.save(); ctx.scale(-1,1); ctx.drawImage(vid,-400,0,400,300); ctx.restore();
 
   const imgData = c.toDataURL("image/jpeg", .85);
+  const seq = snapSeq; // use current seq for this round
 
-  // BUG FIX: use a unique snapId so host/guest frames always pair correctly
-  const snapId = Date.now() + "-" + Math.random().toString(36).slice(2,6);
-  if (conn?.open) conn.send({ type:"snap", imgData, snapId });
+  // Send my frame WITH the seq number so friend can pair it
+  if (conn?.open) conn.send({ type:"snap", imgData, seq });
 
-  photos.push({ mine: c, theirs: null, snapId, combined: null });
-  tryFinalize(photos.length - 1);
+  // Ensure slot exists
+  if (!photos[seq]) photos[seq] = { mine:null, theirs:null, combined:null };
+  photos[seq].mine = c;
+  tryFinalize(seq);
 }
 
-function receiveSnap(imgData, snapId) {
-  // BUG FIX: match by snapId if available, otherwise first incomplete slot
-  let i = snapId
-    ? photos.findIndex(p => p.snapId === snapId && !p.theirs)
-    : photos.findIndex(p => p.theirs === null && p.mine !== null);
-
-  if (i === -1) {
-    // Friend snapped before us — create a holding slot
-    photos.push({ mine: null, theirs: null, snapId: snapId || null, combined: null });
-    i = photos.length - 1;
-  }
+function receiveSnap(imgData, seq) {
+  // Ensure slot exists
+  if (!photos[seq]) photos[seq] = { mine:null, theirs:null, combined:null };
 
   const img = new Image();
   img.onload = () => {
     const c = document.createElement("canvas");
     c.width = 400; c.height = 300;
     c.getContext("2d").drawImage(img,0,0,400,300);
-    photos[i].theirs = c;
-    tryFinalize(i);
+    photos[seq].theirs = c;
+    tryFinalize(seq);
   };
   img.src = imgData;
 }
 
-function tryFinalize(i) {
-  const p = photos[i];
-  if (!p?.mine || !p?.theirs) return;
+function tryFinalize(seq) {
+  const p = photos[seq];
+  if (!p?.mine || !p?.theirs) return; // wait until both frames arrive
 
   const combined = buildCombined(p.mine, p.theirs);
   p.combined = combined;
 
-  addThumb(combined, i);
+  addThumb(combined, seq);
   updateStatus();
 
+  // Advance seq for next photo
+  snapSeq = seq + 1;
+
   countingDown = false;
-  const done = photos.filter(p=>p.combined).length;
-  if (done < 4) document.getElementById("shootBtn").disabled = false;
+  if (completedCount() < 4) {
+    document.getElementById("shootBtn").disabled = false;
+  }
 }
 
 /* Build a single wide canvas: [mine | theirs] with soft centre blend */
@@ -784,59 +789,61 @@ function buildCombined(left, right) {
   return c;
 }
 
-/* ═══════════ THUMBNAIL + DELETE BUTTON ═══════════ */
-function addThumb(canvas, idx) {
+function completedCount() {
+  return photos.filter(p => p && p.combined).length;
+}
+
+/* ═══════════ THUMBNAILS + DELETE ═══════════ */
+function addThumb(canvas, seq) {
+  // Remove old thumb for this seq if re-taking
+  const old = document.querySelector(`.thumb-wrap[data-seq="${seq}"]`);
+  if (old) old.remove();
+
   const wrap = document.createElement("div");
   wrap.className = "thumb-wrap";
-  wrap.dataset.idx = idx;
+  wrap.dataset.seq = seq;
 
   const img = document.createElement("img");
   img.src = canvas.toDataURL();
 
-  // Delete / retake button
   const del = document.createElement("button");
   del.className = "del-btn";
-  del.innerText = "✕";
-  del.title = "Delete & retake";
-  del.onclick = (e) => {
-    e.stopPropagation();
-    deletePhoto(idx);
-  };
+  del.innerHTML = "✕";
+  del.title = "Delete & retake this photo";
+  del.onclick = (e) => { e.stopPropagation(); deletePhoto(seq); };
 
   wrap.appendChild(img);
   wrap.appendChild(del);
   document.getElementById("thumbs").appendChild(wrap);
 }
 
-function deletePhoto(idx) {
-  // Remove from photos array (mark as deleted)
-  photos[idx] = { mine:null, theirs:null, combined:null, deleted:true };
+function deletePhoto(seq) {
+  // Wipe the slot so it can be reused
+  photos[seq] = { mine:null, theirs:null, combined:null };
+  snapSeq = seq; // reuse this seq number next capture
 
-  // Remove thumbnail from DOM
-  const wrap = document.querySelector(`.thumb-wrap[data-idx="${idx}"]`);
+  // Remove from DOM
+  const wrap = document.querySelector(`.thumb-wrap[data-seq="${seq}"]`);
   if (wrap) wrap.remove();
 
-  // Re-number remaining thumb data-idx stays same — just recount
   updateStatus();
+  document.getElementById("shootBtn").disabled = false;
 
-  // Re-enable shoot button if under 4 completed
-  const done = photos.filter(p=>p.combined).length;
-  if (done < 4) document.getElementById("shootBtn").disabled = false;
-
-  // Notify friend to also delete that slot
-  if (conn?.open) conn.send({ type:"delete", idx });
+  // Tell friend to delete same slot
+  if (conn?.open) conn.send({ type:"delete", seq });
 }
 
 function updateStatus() {
-  const done = photos.filter(p=>p.combined).length;
+  const done = completedCount();
   document.getElementById("photoStatus").innerText =
-    done >= 4 ? "Strip ready! ✨ Click Generate Strip 🎞"
-              : `Photo ${done} of 4 taken 💖`;
+    done >= 4
+      ? "Strip ready! ✨ Click Generate Strip 🎞"
+      : `Photo ${done} of 4 taken 💖`;
 }
 
 /* ═══════════ GENERATE STRIP ═══════════ */
 function generateStrip() {
-  const done = photos.filter(p=>p.combined);
+  const done = photos.filter(p => p && p.combined);
   if (!done.length) { alert("Take some photos first 💕"); return; }
 
   const layout = document.getElementById("layout").value;
